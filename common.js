@@ -318,21 +318,37 @@ RA.crud = function (o) {
 RA.topoSvg = function (inv) {
   var A = (inv.activos || []).filter(function (a) { return typeof a.x === "number"; });
   if (!A.length) return null;
-  var NS = "http://www.w3.org/2000/svg", byId = {}; A.forEach(function (a) { byId[a.id] = a; });
-  var xs = A.map(function (a) { return a.x; }), ys = A.map(function (a) { return a.y; });
-  var x0 = Math.min.apply(null, xs) - 90, x1 = Math.max.apply(null, xs) + 90, y0 = Math.min.apply(null, ys) - 40, y1 = Math.max.apply(null, ys) + 40;
-  var svg = document.createElementNS(NS, "svg"); svg.setAttribute("viewBox", [x0, y0, x1 - x0, y1 - y0].join(" ")); svg.setAttribute("class", "topo");
-  svg.setAttribute("role", "img"); svg.setAttribute("aria-label", "Diagrama de la topología de red importada");
+  var NS = "http://www.w3.org/2000/svg";
   function mk(tag, attrs, txt) { var e = document.createElementNS(NS, tag); Object.keys(attrs).forEach(function (k) { e.setAttribute(k, attrs[k]); }); if (txt) e.textContent = txt; return e; }
+  // escala: el texto se mantiene legible aunque el dibujo de CML sea grande
+  var rx = Math.max.apply(null, A.map(function (a) { return a.x; })) - Math.min.apply(null, A.map(function (a) { return a.x; })),
+      ry = Math.max.apply(null, A.map(function (a) { return a.y; })) - Math.min.apply(null, A.map(function (a) { return a.y; })),
+      k = Math.max(1, (ry + 80) / 520, (rx + 180) / 900);
+  var P = {}; A.forEach(function (a) { P[a.id] = { a: a, x: a.x, y: a.y, w: Math.max(76 * k, a.nombre.length * 7.6 * k + 18 * k), h: 28 * k }; });
+  var L = A.map(function (a) { return P[a.id]; });
+  for (var it = 0; it < 40; it++) {                      // separa nodos que se solapan (mismo nivel vertical)
+    var moved = false;
+    for (var i = 0; i < L.length; i++) for (var j = i + 1; j < L.length; j++) {
+      var p = L[i], q = L[j];
+      if (Math.abs(p.y - q.y) < (p.h + q.h) / 2 + 4) {
+        var need = (p.w + q.w) / 2 + 10 - Math.abs(p.x - q.x);
+        if (need > 0) { var d = (p.x <= q.x ? -1 : 1) * need / 2; p.x += d; q.x -= d; moved = true; }
+      }
+    }
+    if (!moved) break;
+  }
+  var x0 = Math.min.apply(null, L.map(function (n) { return n.x - n.w / 2; })) - 30, x1 = Math.max.apply(null, L.map(function (n) { return n.x + n.w / 2; })) + 30,
+      y0 = Math.min.apply(null, L.map(function (n) { return n.y - n.h / 2; })) - 30, y1 = Math.max.apply(null, L.map(function (n) { return n.y + n.h / 2; })) + 30;
+  var svg = mk("svg", { viewBox: [x0, y0, x1 - x0, y1 - y0].join(" "), "class": "topo", role: "img", "aria-label": "Diagrama de la topología de red importada" });
   (inv.enlaces || []).forEach(function (l) {
-    var a = byId[l.a], b = byId[l.b]; if (a && b) svg.appendChild(mk("line", { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: "tl" }));
+    var a = P[l.a], b = P[l.b]; if (a && b) svg.appendChild(mk("line", { x1: a.x, y1: a.y, x2: b.x, y2: b.y, "class": "tl", "stroke-width": 2 * k }));
   });
   var cls = { "Firewall": "fw", "Router": "rt", "Switch": "sw", "Conexión externa": "ext" };
-  A.forEach(function (a) {
-    var w = Math.max(76, a.nombre.length * 7.4 + 18), g = mk("g", { class: "tn t-" + (cls[a.tipo] || "host") });
+  L.forEach(function (n) {
+    var a = n.a, g = mk("g", { "class": "tn t-" + (cls[a.tipo] || "host") });
     g.appendChild(mk("title", {}, a.nombre + " · " + a.tipo + (a.ips && a.ips.length ? " · " + a.ips.join(", ") : "")));
-    g.appendChild(mk("rect", { x: a.x - w / 2, y: a.y - 14, width: w, height: 28, rx: 7 }));
-    g.appendChild(mk("text", { x: a.x, y: a.y + 4, "text-anchor": "middle" }, a.nombre)); svg.appendChild(g);
+    g.appendChild(mk("rect", { x: n.x - n.w / 2, y: n.y - n.h / 2, width: n.w, height: n.h, rx: 7 * k, "stroke-width": 1.6 * k }));
+    g.appendChild(mk("text", { x: n.x, y: n.y + 4.5 * k, "text-anchor": "middle", "font-size": 13 * k }, a.nombre)); svg.appendChild(g);
   });
   return svg;
 };

@@ -128,7 +128,7 @@
         id: n.label || n.id, nombre: n.label || n.id, tipo: tipo, def: n.def, hostname: ex.hostname,
         ips: ex.ips.map(function (x) { return x.ip + "/" + x.prefix; }), redes: [], vlans: ex.vlans, dhcp: ex.dhcp,
         publica: ex.ips.some(function (x) { return !x.privada; }),
-        ifaces: n.ifaces.length, conexiones: [], criticidad: 3, ubicacion: "On-premise",
+        ifaces: n.ifaces.length, conexiones: [], criticidad: criticidadSugerida(tipo, n.label || n.id), ubicacion: "On-premise",
         destino: destinoSugerido(tipo), vulns: hallazgos(tipo, n.cfg), riesgos: [], notas: "", origen: "cml", x: n.x, y: n.y
       };
       ex.ips.forEach(function (x) { if (a.redes.indexOf(x.red) < 0) a.redes.push(x.red); });
@@ -149,6 +149,15 @@
       for (var j = 0; j < nodos[i].ifaces.length; j++) if (nodos[i].ifaces[j].id === iid) return nodos[i].ifaces[j].label;
     }
     return "";
+  }
+  /* Criticidad inicial por rol (1–5): es una sugerencia, el estudiante la ajusta en el inventario. */
+  function criticidadSugerida(tipo, nombre) {
+    if (tipo === "Conexión externa") return 1;
+    if (/dato|db|sql|base/i.test(nombre)) return 5;
+    if (/siem|tacacs|aaa|plc|hmi|scada|ids/i.test(nombre)) return 4;
+    if (tipo === "Firewall" || tipo === "Switch") return 4;
+    if (/casa|remot|tecnico/i.test(nombre)) return 2;
+    return 3;
   }
   function destinoSugerido(tipo) {
     if (RED.indexOf(tipo) >= 0) return "Reemplazar por servicio nativo de la nube";

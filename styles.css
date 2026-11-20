@@ -127,10 +127,10 @@ td small{color:var(--muted);display:block}
 .checks{max-height:170px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:var(--panel);display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:2px 10px}
 label.chk{display:block;color:var(--text);font-size:.85rem;margin:0}
 label.chk input{width:auto}
-.topo{width:100%;height:auto;max-height:440px;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.topo{width:100%;height:auto;max-height:560px;background:var(--bg);border:1px solid var(--line);border-radius:10px}
 .topo .tl{stroke:var(--muted);stroke-width:2}
 .topo .tn rect{stroke-width:1.6}
-.topo .tn text{font-size:13px;font-weight:600;fill:var(--text)}
+.topo .tn text{font-weight:600;fill:var(--text)}
 .t-fw rect{fill:var(--critico-soft);stroke:var(--critico)}
 .t-rt rect{fill:var(--alto-soft);stroke:var(--alto)}
 .t-sw rect{fill:var(--medio-soft);stroke:var(--medio)}
@@ -157,7 +157,7 @@ label.chk input{width:auto}
 @media print{
   .nav,.crudbar,.crud-form,.filebox{display:none!important}
   header.top{border:0;padding:0 0 6px}
-  .topo{max-height:300px}
+  .topo{max-height:380px}
   .rep section.card{break-inside:auto}
   tr{break-inside:avoid}
 }
