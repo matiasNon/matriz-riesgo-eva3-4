@@ -73,6 +73,43 @@ git branch -M main
 git push -u origin main
 ```
 
-## Relación con la evaluación 3 y 4
+## Evaluación final: sistema de migración a la nube
 
-Esta actividad es la base de la evaluación final (sistema web que genera automáticamente el informe de migración a la nube). Pendiente de ampliar: inventario de activos de la topología CML, plan de migración y contingencia, y generación de informe PDF/Excel resumido.
+La misma aplicación (sin backend, solo archivos estáticos) se amplió a cinco secciones que comparten datos en el navegador:
+
+| Página | Qué hace |
+|---|---|
+| `index.html` · Matriz de riesgos | Matriz R = P × I, mapa de calor, residual y catálogo ISO (la actividad original). Botones para vaciar la matriz o restablecer el caso CoopAndes. |
+| `inventario.html` · Inventario | **Importa el laboratorio CML (.yaml)**: nodos, enlaces, IP, redes y VLAN, y dibuja la topología. Sugiere vulnerabilidades por activo, que se validan y vinculan a riesgos de la matriz. Botón «→ Riesgo» para crear uno desde un activo. |
+| `migracion.html` · Migración | Plan por fases (plantilla de 5, con plan de reversa obligatorio, activos asignados y cronograma), plan de contingencia (plantilla de 6 escenarios con RTO/RPO) y gestión de seguridad con controles ISO/IEC 27001:2022. |
+| `nube.html` · Nube | Zonas, instancias y reglas de firewall. Genera una propuesta desde el inventario y **audita las reglas** (SSH/RDP o bases de datos abiertas a Internet, IP pública en zonas privadas, falta de segmentación, etc.). |
+| `informe.html` · Informe | Informe resumen conciso con portada, KPIs, topología, mapas de calor, plan y auditoría. Se exporta a **PDF** (imprimir), **Excel .xlsx** de 10 hojas y respaldo **.json**. Incluye una lista de revisión previa a la entrega. |
+
+Archivos de apoyo: `styles.css` (estilos), `common.js` (cálculo de riesgo, almacenamiento, tablas/formularios, generador de .xlsx), `cml.js` (importador de CML) y `audit.js` (auditor de reglas y propuestas).
+
+### Cómo usarlo cuando el docente entregue el CML
+
+1. **Inventario** → elegir el `.yaml` exportado de CML → «Importar topología». Se crean los activos con IP, redes, conexiones y vulnerabilidades sugeridas.
+2. Validar vulnerabilidades, fijar la **criticidad** y el **destino de migración** de cada activo (migrar a instancia, reemplazar por servicio nativo, mantener, retirar).
+3. **Matriz de riesgos** → «Vaciar matriz» y registrar los riesgos del caso (usa «→ Riesgo» desde el inventario); luego vincularlos a los activos.
+4. **Migración** → cargar plantillas de fases y contingencia, completar fechas y responsables; sincronizar controles ISO.
+5. **Nube** → generar propuesta, ajustar zonas/instancias, agregar reglas base y corregir hallazgos de la auditoría.
+6. **Informe** → completar la portada, resolver los pendientes de la revisión y exportar PDF y Excel.
+
+### Seguridad y privacidad del importador
+
+- El archivo CML se procesa en el navegador; no se sube a ningún servidor.
+- Se extraen solo datos de red. **El texto de la configuración se descarta**: contraseñas, claves de enable, PSK de VPN y secretos de TACACS no se guardan ni aparecen en el informe (verificado con el laboratorio de prueba). Solo se mencionan como hallazgo, sin su valor.
+- Todo texto ingresado se muestra con `textContent` (sin HTML), y los CSV/Excel neutralizan fórmulas (`=`, `+`, `-`, `@`).
+
+### Límites a considerar
+
+- El importador espera el YAML de **exportación estándar de CML** (formato en bloques). Con otro formato mostrará un error y se puede ingresar el inventario a mano.
+- Las vulnerabilidades sugeridas son **heurísticas** sobre la configuración (contraseñas locales, PSK, sin syslog/AAA, SSH por contraseña, etc.): el estudiante debe validarlas.
+- Plantillas de RTO/RPO y tamaños de instancia son ejemplos a ajustar.
+- Los datos viven en el `localStorage` del navegador: respaldar con el `.json` del Informe.
+- Pruebas realizadas: importador probado con un laboratorio CML real de otra unidad (14 nodos, 14 enlaces), 58 verificaciones automáticas del flujo completo en jsdom y lectura del .xlsx con openpyxl. **No se probó en un navegador real** (la apariencia y la impresión a PDF deben revisarse a mano).
+
+### Fechas de la evaluación (según el resumen de clase)
+
+El resumen menciona «diseño: viernes 18 de diciembre» y «entrega final: 13 de diciembre», que parecen contradecirse. Conviene confirmar las fechas con el docente.

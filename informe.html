@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RiskAndes · Informe de migración</title>
+<meta name="description" content="Informe resumen automático del plan de migración a la nube y la matriz de riesgos, exportable a PDF y Excel.">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header id="top"></header>
+<main>
+  <section class="card noprint" aria-label="Datos del informe">
+    <h2>Datos de portada</h2>
+    <div class="crud-grid" id="metaForm"></div>
+  </section>
+
+  <section class="card noprint" aria-label="Revisión previa a la entrega">
+    <h2>Revisión previa a la entrega</h2>
+    <div id="check"></div>
+  </section>
+
+  <section class="card noprint" aria-label="Exportar">
+    <h2>Exportar y respaldar</h2>
+    <button type="button" class="primary" id="btnPdf">Imprimir / guardar como PDF</button>
+    <button type="button" id="btnXlsx">Descargar Excel (.xlsx)</button>
+    <button type="button" id="btnJson">Respaldar proyecto (.json)</button>
+    <div class="filebox" style="margin-top:10px">
+      <label for="fRest">Restaurar un respaldo (.json)</label>
+      <input type="file" id="fRest" accept=".json,application/json">
+      <button type="button" id="btnRest" class="danger" style="margin-top:6px">Restaurar (reemplaza los datos actuales)</button>
+    </div>
+    <div class="msg" id="msgEx" role="status"></div>
+    <p class="note">Los datos viven en este navegador. Respalda el proyecto en .json antes de cambiar de equipo o borrar los datos del sitio. El PDF se genera con «Imprimir» → «Guardar como PDF».</p>
+  </section>
+
+  <div class="rep" id="rep"></div>
+</main>
+<script src="common.js"></script>
+<script src="cml.js"></script>
+<script src="audit.js"></script>
+<script>
+"use strict";
+var $ = RA.$, el = RA.el;
+var META = [["org", "Organización"], ["titulo", "Título del informe"], ["grupo", "Grupo"], ["integrantes", "Integrantes"], ["docente", "Docente"], ["asignatura", "Asignatura"]];
+
+function datos(){
+  var meta = RA.load(RA.KEYS.meta, RA.META_DEF), inv = RA.load(RA.KEYS.inv, RA.INV_DEF), R = RA.riesgos(),
+      F = RA.load(RA.KEYS.mig, []), C = RA.load(RA.KEYS.cont, []), S = RA.load(RA.KEYS.sgsi, []), N = RA.load(RA.KEYS.nube, RA.NUBE_DEF), aud = AUD.auditar(N);
+  var nm = {}; inv.activos.forEach(function(a){ nm[a.id] = a.nombre; });
+  var zn = {}; N.zonas.forEach(function(z){ zn[z.id] = z.id + " · " + z.nombre; });
+  function nr(x){ var c = RA.calc(x.p, x.i); return c.r + " · " + c.n.nombre; }
+  function rr(x){ var c = RA.res(x); return c.r + " · " + c.n.nombre; }
+  var T = {};
+  T.inv = { head: ["ID", "Activo", "Tipo", "IP / redes", "Ubicación", "Criticidad", "Destino", "Vulnerabilidades", "Riesgos vinculados", "Conexiones"],
+    rows: inv.activos.map(function(a){ return [a.id, a.nombre, a.tipo, (a.ips || []).join(", "), a.ubicacion || "", a.criticidad || "", a.destino || "", (a.vulns || []).join(" | "), (a.riesgos || []).join(", "), (a.conexiones || []).length]; }),
+    show: [1, 2, 3, 5, 6, 7] };
+  T.riesgos = { head: ["ID", "Activo", "Amenaza", "Vulnerabilidad", "P", "I", "Riesgo inherente", "Fuente del dato", "Control propuesto", "ISO 27001:2022", "P res.", "I res.", "Riesgo residual"],
+    rows: R.slice().sort(function(a, b){ return b.p * b.i - a.p * a.i; }).map(function(x){ return [x.id, x.activo, x.amenaza, x.vulnerabilidad, x.p, x.i, nr(x), x.fuente, x.control || "", x.iso || "", x.pr || "", x.ir || "", rr(x)]; }),
+    show: [0, 1, 2, 6, 8, 12] };
+  T.fases = { head: ["ID", "Fase", "Objetivo", "Inicio", "Fin", "Responsable", "Estado", "Activos", "Criterio de éxito", "Rollback"],
+    rows: F.map(function(f){ return [f.id, f.nombre, f.objetivo || "", f.inicio || "", f.fin || "", f.responsable || "", f.estado, (f.activos || []).map(function(i){ return nm[i] || i; }).join(", "), f.criterio || "", f.rollback || ""]; }),
+    show: [1, 3, 4, 6, 7, 9] };
+  T.cont = { head: ["ID", "Escenario", "Disparador", "Acción de respuesta", "Responsable", "RTO", "RPO", "Prueba"],
+    rows: C.map(function(c){ return [c.id, c.escenario, c.disparador || "", c.accion, c.responsable || "", c.rto || "", c.rpo || "", c.prueba]; }), show: [1, 3, 5, 6, 7] };
+  T.sgsi = { head: ["Control", "Nombre", "Estado", "Responsable", "Evidencia"],
+    rows: S.map(function(s){ return [s.codigo, RA.ISO[s.codigo] || "", s.estado, s.responsable || "", s.evidencia || ""]; }), show: [0, 1, 2, 3] };
+  T.zonas = { head: ["ID", "Zona", "CIDR", "Tipo"], rows: N.zonas.map(function(z){ return [z.id, z.nombre, z.cidr, z.tipo]; }), show: [0, 1, 2, 3] };
+  T.inst = { head: ["ID", "Instancia", "Zona", "IP pública", "Tamaño", "Sistema / rol", "Activo de origen"],
+    rows: N.instancias.map(function(i){ return [i.id, i.nombre, zn[i.zona] || "", i.publica ? "Sí" : "No", i.tamano || "", i.so || "", nm[i.activo] || i.activo || ""]; }), show: [1, 2, 3, 4] };
+  T.reglas = { head: ["ID", "Regla", "Dirección", "Protocolo", "Puerto", "Origen", "Destino", "Acción"],
+    rows: N.reglas.map(function(r){ return [r.id, r.nombre, r.dir, r.proto, r.puerto, r.origen, r.destino, r.accion]; }), show: [1, 3, 4, 5, 6, 7] };
+  T.aud = { head: ["Severidad", "Hallazgo", "Detalle", "Recomendación", "ISO 27001:2022"],
+    rows: aud.map(function(f){ return [f.sev, f.regla, f.detalle, f.rec, f.iso]; }), show: [0, 1, 3] };
+  return { meta: meta, inv: inv, R: R, F: F, C: C, S: S, N: N, aud: aud, T: T };
+}
+
+/* Texto con nivel ("20 · Crítico") se muestra como etiqueta de color */
+function celda(v){
+  var m = /^(\d+) · (Crítico|Alto|Medio|Bajo)$/.exec(String(v));
+  if (m) return el("span", "chip " + ({ "Crítico": "critico", "Alto": "alto", "Medio": "medio", "Bajo": "bajo" })[m[2]], v);
+  return v;
+}
+function tabla(t, vacio){
+  var cols = t.show.map(function(i){ return { h: t.head[i], f: function(r){ return celda(r[i]); } }; });
+  return RA.table(cols, t.rows, vacio);
+}
+function sec(rep, titulo){ var s = el("section", "card"); s.appendChild(el("h2", "", titulo)); rep.appendChild(s); return s; }
+
+function render(){
+  var D = datos(), m = D.meta, rep = $("rep"); rep.textContent = "";
+  var cont = { critico: 0, alto: 0, medio: 0, bajo: 0 }, res = { critico: 0, alto: 0, medio: 0, bajo: 0 };
+  D.R.forEach(function(x){ cont[RA.calc(x.p, x.i).n.k]++; res[RA.res(x).n.k]++; });
+  var sumI = 0, sumR = 0; D.R.forEach(function(x){ sumI += x.p * x.i; sumR += RA.res(x).r; });
+  var acum = { critico: 0, alto: 0, medio: 0 }; D.aud.forEach(function(f){ if (acum[f.sev] != null) acum[f.sev]++; });
+
+  var portada = el("section", "card cover"); portada.appendChild(el("h2", "", m.titulo || "Informe"));
+  portada.appendChild(el("p", "", m.org || ""));
+  [["Grupo", m.grupo], ["Integrantes", m.integrantes], ["Docente", m.docente], ["Asignatura", m.asignatura], ["Fecha", RA.hoy()]].forEach(function(p){ if (p[1]) portada.appendChild(el("p", "", p[0] + ": " + p[1])); });
+  rep.appendChild(portada);
+
+  var s1 = sec(rep, "1. Resumen ejecutivo");
+  var k = el("div", "kpis");
+  [["", D.inv.activos.length, "Activos inventariados"], ["", D.R.length, "Riesgos en la matriz"], ["k-critico", cont.critico, "Riesgos críticos (inherentes)"],
+   ["k-bajo", res.critico + res.alto, "Críticos + altos tras controles"], ["", D.F.length, "Fases de migración"], ["", acum.critico, "Hallazgos críticos en reglas de nube"]].forEach(function(t){
+    var d = el("div", "kpi " + t[0]); d.appendChild(el("b", "", String(t[1]))); d.appendChild(el("span", "", t[2])); k.appendChild(d); });
+  s1.appendChild(k);
+  var ul = el("ul", "list"); ul.style.marginTop = "10px";
+  var top = D.R.slice().sort(function(a, b){ return b.p * b.i - a.p * a.i; })[0];
+  ul.appendChild(el("li", "", "Se inventariaron " + D.inv.activos.length + " activos" + (D.inv.titulo ? " de la topología «" + D.inv.titulo + "»" : "") + "; " + D.inv.activos.filter(function(a){ return (a.vulns || []).length; }).length + " tienen vulnerabilidades asociadas."));
+  if (D.R.length) ul.appendChild(el("li", "", "Riesgos inherentes: " + cont.critico + " críticos, " + cont.alto + " altos, " + cont.medio + " medios y " + cont.bajo + " bajos. Mayor riesgo: " + top.id + " (" + top.activo + ", " + top.p * top.i + ")."));
+  if (D.R.length) ul.appendChild(el("li", "", "Con los controles propuestos el riesgo total baja " + (sumI ? Math.round((sumI - sumR) / sumI * 100) : 0) + "% (" + sumI + " → " + sumR + " puntos); quedan " + res.critico + " críticos y " + res.alto + " altos."));
+  if (D.F.length) ul.appendChild(el("li", "", "La migración se organiza en " + D.F.length + " fases, cada una con plan de reversa, y " + D.C.length + " escenarios de contingencia."));
+  if (D.N.zonas.length || D.N.reglas.length) ul.appendChild(el("li", "", "Diseño en la nube" + (D.N.proveedor ? " (" + D.N.proveedor + ")" : "") + ": " + D.N.zonas.length + " zonas, " + D.N.instancias.length + " instancias y " + D.N.reglas.length + " reglas; la auditoría detecta " + acum.critico + " críticos, " + acum.alto + " altos y " + acum.medio + " medios."));
+  s1.appendChild(ul);
+
+  var s2 = sec(rep, "2. Inventario de activos y topología");
+  var svg = RA.topoSvg(D.inv); if (svg) s2.appendChild(svg);
+  s2.appendChild(tabla(D.T.inv, "Sin activos inventariados."));
+
+  var s3 = sec(rep, "3. Matriz de riesgos");
+  var cols = el("div", "cols2");
+  [["Riesgo inherente", "inh"], ["Riesgo residual (tras controles)", "res"]].forEach(function(p){
+    var b = el("div"); b.appendChild(el("h3", "", p[0])); var hm = el("div", "heat"); b.appendChild(hm); RA.heat(hm, D.R, p[1]); cols.appendChild(b); });
+  s3.appendChild(cols); s3.appendChild(tabla(D.T.riesgos, "Sin riesgos registrados."));
+
+  var s4 = sec(rep, "4. Plan de migración"); s4.appendChild(tabla(D.T.fases, "Sin fases definidas."));
+  var s5 = sec(rep, "5. Configuración en la nube");
+  s5.appendChild(el("h3", "", "Zonas")); s5.appendChild(tabla(D.T.zonas, "Sin zonas."));
+  s5.appendChild(el("h3", "", "Instancias")); s5.appendChild(tabla(D.T.inst, "Sin instancias."));
+  s5.appendChild(el("h3", "", "Reglas de seguridad")); s5.appendChild(tabla(D.T.reglas, "Sin reglas."));
+  s5.appendChild(el("h3", "", "Auditoría de reglas")); s5.appendChild(tabla(D.T.aud, "Sin hallazgos."));
+  var s6 = sec(rep, "6. Plan de contingencia"); s6.appendChild(tabla(D.T.cont, "Sin escenarios."));
+  var s7 = sec(rep, "7. Gestión de la seguridad (ISO/IEC 27001:2022)"); s7.appendChild(tabla(D.T.sgsi, "Sin controles."));
+  revision(D);
+}
+
+/* ---- Revisión previa a la entrega ---- */
+function revision(D){
+  var box = $("check"); box.textContent = "";
+  var A = D.inv.activos, migr = A.filter(function(a){ return /^(Migrar|Reemplazar)/.test(a.destino || ""); }), asign = {};
+  D.F.forEach(function(f){ (f.activos || []).forEach(function(i){ asign[i] = 1; }); });
+  var items = [
+    [A.length > 0, "Inventario cargado (" + A.length + " activos)"],
+    [A.length > 0 && A.every(function(a){ return (a.vulns || []).length; }), "Todos los activos tienen vulnerabilidades asociadas"],
+    [A.length > 0 && A.every(function(a){ return (a.riesgos || []).length; }), "Todos los activos están vinculados a un riesgo de la matriz (recomendado)"],
+    [D.R.length > 0 && D.R.every(function(x){ return x.fuente && x.control && x.pr && x.ir; }), "Cada riesgo tiene fuente, control y riesgo residual"],
+    [D.F.length > 0 && D.F.every(function(f){ return f.inicio && f.fin && f.rollback; }), "Todas las fases tienen fechas y plan de reversa"],
+    [migr.length > 0 && migr.every(function(a){ return asign[a.id]; }), "Todos los activos migrables están asignados a una fase"],
+    [D.C.length > 0 && D.C.every(function(c){ return c.prueba === "Probado"; }), "Contingencia definida y probada"],
+    [D.N.zonas.length > 0 && D.N.instancias.length > 0 && D.N.reglas.length > 0, "Nube con zonas, instancias y reglas definidas"],
+    [D.N.reglas.length > 0 && !D.aud.some(function(f){ return f.sev === "critico" || f.sev === "alto"; }), "Auditoría de reglas sin hallazgos críticos ni altos"],
+    [D.S.length > 0, "Controles ISO de gestión de la seguridad definidos"],
+    [!!(D.meta.grupo && D.meta.integrantes), "Portada con grupo e integrantes"]
+  ];
+  var ul = el("ul", "list");
+  items.forEach(function(i){ var li = el("li"); li.appendChild(el("span", "chip " + (i[0] ? "ok" : "warn"), i[0] ? "✓ Listo" : "Pendiente")); li.appendChild(document.createTextNode(" " + i[1])); ul.appendChild(li); });
+  box.appendChild(ul);
+}
+
+/* ---- Excel ---- */
+function hojas(){
+  var D = datos(), m = D.meta, res = { critico: 0, alto: 0, medio: 0, bajo: 0 };
+  var resumen = [["Campo", "Valor"], ["Organización", m.org], ["Título", m.titulo], ["Grupo", m.grupo], ["Integrantes", m.integrantes], ["Docente", m.docente], ["Asignatura", m.asignatura], ["Fecha", RA.hoy()],
+    ["Activos inventariados", D.inv.activos.length], ["Riesgos", D.R.length], ["Fases", D.F.length], ["Escenarios de contingencia", D.C.length], ["Zonas / instancias / reglas", D.N.zonas.length + " / " + D.N.instancias.length + " / " + D.N.reglas.length],
+    ["Hallazgos críticos de auditoría", D.aud.filter(function(f){ return f.sev === "critico"; }).length]];
+  function h(name, t){ return { name: name, rows: [t.head].concat(t.rows) }; }
+  return [{ name: "Resumen", rows: resumen }, h("Inventario", D.T.inv), h("Riesgos", D.T.riesgos), h("Fases", D.T.fases), h("Contingencia", D.T.cont), h("SGSI ISO 27001", D.T.sgsi),
+    h("Zonas", D.T.zonas), h("Instancias", D.T.inst), h("Reglas", D.T.reglas), h("Auditoría", D.T.aud)];
+}
+
+/* ---- Portada editable ---- */
+(function(){
+  var f = $("metaForm"), meta = RA.load(RA.KEYS.meta, RA.META_DEF);
+  META.forEach(function(p){
+    var d = el("div"), l = el("label", "", p[1]), i = el("input"); i.id = "m_" + p[0]; l.setAttribute("for", i.id); i.maxLength = 200; i.value = meta[p[0]] || "";
+    i.addEventListener("input", function(){ meta[p[0]] = i.value.trim(); RA.save(RA.KEYS.meta, meta); });
+    i.addEventListener("change", render); d.appendChild(l); d.appendChild(i); f.appendChild(d);
+  });
+})();
+
+RA.header("informe.html");
+$("btnPdf").addEventListener("click", function(){ window.print(); });
+$("btnXlsx").addEventListener("click", function(){
+  RA.download("riskandes_proyecto.xlsx", RA.xlsx(hojas()), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+});
+$("btnJson").addEventListener("click", function(){ RA.download("riskandes_respaldo.json", JSON.stringify(RA.exportProyecto(), null, 1), "application/json"); });
+$("btnRest").addEventListener("click", function(){
+  var msg = $("msgEx"), f = $("fRest").files[0]; msg.className = "msg";
+  if (!f) { msg.textContent = "Selecciona un archivo de respaldo .json."; return; }
+  if (f.size > 8 * 1024 * 1024) { msg.textContent = "El archivo es demasiado grande para ser un respaldo."; return; }
+  if (!window.confirm("Se reemplazarán los datos actuales por los del respaldo. ¿Continuar?")) return;
+  f.text().then(function(t){
+    try { RA.importProyecto(JSON.parse(t)); } catch (e) { msg.textContent = "No se pudo restaurar: " + e.message; return; }
+    location.reload();
+  });
+});
+render();
+</script>
+</body>
+</html>

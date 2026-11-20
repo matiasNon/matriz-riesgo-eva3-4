@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RiskAndes · Inventario de activos</title>
+<meta name="description" content="Inventario de activos a partir de una topología CML, con vulnerabilidades asociadas y vínculo a la matriz de riesgos.">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header id="top"></header>
+<main>
+  <section class="card" aria-label="Importar topología">
+    <h2>1. Importar topología CML</h2>
+    <div class="filebox">
+      <label for="fArchivo">Archivo del laboratorio CML (.yaml / .yml)</label>
+      <input id="fArchivo" type="file" accept=".yaml,.yml,text/yaml,text/plain">
+      <p class="note">El archivo se lee en tu navegador y no se envía a ningún servidor. Se extraen nodos, enlaces, IP y VLAN. <b>Las contraseñas, claves y PSK de la configuración se descartan</b>: nunca se guardan ni salen en el informe.</p>
+      <button class="primary" type="button" id="btnImportar">Importar topología</button>
+      <button class="danger" type="button" id="btnVaciar">Vaciar inventario</button>
+      <div class="msg" id="msgImp" role="status"></div>
+    </div>
+  </section>
+
+  <section class="card" aria-label="Resumen del inventario">
+    <h2>Resumen</h2>
+    <div class="kpis" id="kpis"></div>
+  </section>
+
+  <section class="card" id="cardTopo" aria-label="Topología" hidden>
+    <h2>Topología importada</h2>
+    <div id="topo"></div>
+    <p class="note" id="topoInfo"></p>
+  </section>
+
+  <section class="card" aria-label="Inventario de activos">
+    <h2>2. Activos, vulnerabilidades y riesgos vinculados</h2>
+    <p class="note">Las vulnerabilidades detectadas al importar son <b>sugerencias</b> basadas en la configuración de cada nodo: valídalas, corrígelas y agrega las que falten. Vincula cada activo a los riesgos de la matriz o usa «→ Riesgo» para crear uno nuevo.</p>
+    <div id="crud"></div>
+  </section>
+</main>
+<script src="common.js"></script>
+<script src="cml.js"></script>
+<script>
+"use strict";
+var $ = RA.$, el = RA.el;
+var inv = RA.load(RA.KEYS.inv, RA.INV_DEF);
+var TIPOS = ["Firewall","Router","Switch","Host Linux","Servidor Linux","Servidor de logs","Estación de trabajo","Base de datos","Conexión externa","Otro"];
+var DESTINOS = ["Migrar a instancia en la nube","Reemplazar por servicio nativo de la nube","Mantener on-premise","Retirar","No aplica"];
+
+function guardar(){ RA.save(RA.KEYS.inv, inv); }
+function redesDe(ips){
+  var out = [];
+  (ips || []).forEach(function(s){
+    var m = /^(\d+\.\d+\.\d+\.\d+)\/(\d+)$/.exec(s); if (!m) return;
+    var r = CML.red(m[1], +m[2]); if (out.indexOf(r) < 0) out.push(r);
+  });
+  return out;
+}
+function riesgosIds(){ return RA.riesgos().map(function(r){ return { v: r.id, l: r.id + " · " + r.activo }; }); }
+
+function kpis(){
+  var k = $("kpis"); k.textContent = "";
+  var A = inv.activos, conV = A.filter(function(a){ return (a.vulns || []).length; }).length,
+      conR = A.filter(function(a){ return (a.riesgos || []).length; }).length, redes = {};
+  A.forEach(function(a){ (a.redes || []).forEach(function(r){ redes[r] = 1; }); });
+  function kpi(cls, n, t){ var d = el("div", "kpi " + cls); d.appendChild(el("b", "", String(n))); d.appendChild(el("span", "", t)); k.appendChild(d); }
+  kpi("", A.length, "Activos inventariados");
+  kpi(A.length && conV < A.length ? "k-alto" : "", A.length - conV, "Sin vulnerabilidades asociadas");
+  kpi("", conV, "Con vulnerabilidades");
+  kpi(A.length && conR < A.length ? "k-medio" : "", A.length - conR, "Sin riesgo vinculado en la matriz");
+  kpi("", Object.keys(redes).length, "Redes / segmentos");
+}
+function topo(){
+  var c = $("topo"); c.textContent = ""; var svg = RA.topoSvg(inv);
+  $("cardTopo").hidden = !svg; if (!svg) return;
+  c.appendChild(svg);
+  $("topoInfo").textContent = (inv.titulo ? inv.titulo + " · " : "") + inv.activos.length + " nodos, " + (inv.enlaces || []).length + " enlaces. Color: rojo firewall, naranjo router, amarillo switch, verde host/servidor, punteado conexión externa.";
+}
+function refrescar(){ kpis(); topo(); }
+
+var crud = RA.crud({
+  mount: $("crud"), prefix: "A", agregar: "＋ Agregar activo manualmente", vacio: "Inventario vacío. Importa un laboratorio CML o agrega activos manualmente.",
+  get: function(){ return inv.activos; },
+  set: function(l){ l.forEach(function(a){ a.redes = redesDe(a.ips); }); inv.activos = l; guardar(); },
+  onChange: refrescar,
+  fields: [
+    { k: "nombre", label: "Nombre del activo", req: true, maxlength: 80 },
+    { k: "tipo", label: "Tipo", type: "select", options: TIPOS },
+    { k: "ips", label: "IP/prefijo (separadas por coma)", placeholder: "10.10.20.10/27, 10.10.20.11/27", maxlength: 200,
+      toForm: function(v){ return Array.isArray(v) ? v.join(", ") : (v || ""); },
+      fromForm: function(v){ return v ? v.split(",").map(function(s){ return s.trim(); }).filter(Boolean) : []; } },
+    { k: "ubicacion", label: "Ubicación actual", def: "On-premise", maxlength: 60 },
+    { k: "criticidad", label: "Criticidad (1–5)", type: "select", options: ["1","2","3","4","5"], def: "3", fromForm: function(v){ return Number(v) || 3; }, toForm: function(v){ return String(v || 3); } },
+    { k: "destino", label: "Destino en la migración", type: "select", options: DESTINOS },
+    { k: "vulns", label: "Vulnerabilidades (una por línea)", type: "textarea", maxlength: 1200,
+      toForm: function(v){ return Array.isArray(v) ? v.join("\n") : (v || ""); },
+      fromForm: function(v){ return v ? v.split("\n").map(function(s){ return s.trim(); }).filter(Boolean) : []; } },
+    { k: "riesgos", label: "Riesgos vinculados de la matriz", type: "checks", options: riesgosIds, vacio: "La matriz de riesgos aún no tiene riesgos." },
+    { k: "notas", label: "Notas", type: "textarea", maxlength: 400 }
+  ],
+  validar: function(row, lista, editando){
+    if (!editando && lista.some(function(a){ return a.nombre.toLowerCase() === row.nombre.toLowerCase(); })) return "Ya existe un activo con ese nombre.";
+    return "";
+  },
+  cols: [
+    { h: "ID", f: function(a){ return a.id; } },
+    { h: "Activo", f: function(a){ var d = el("div"); d.appendChild(el("b", "", a.nombre)); d.appendChild(el("small", "", a.tipo + (a.ubicacion ? " · " + a.ubicacion : ""))); return d; } },
+    { h: "IP / redes", f: function(a){ var d = el("div"); d.textContent = (a.ips || []).join(", ") || "—"; if ((a.vlans || []).length) d.appendChild(el("small", "", "VLAN " + a.vlans.join(", "))); return d; } },
+    { h: "Conexiones", cls: "num", f: function(a){ var s = el("span", "", String((a.conexiones || []).length)); if ((a.conexiones || []).length) s.title = a.conexiones.join("\n"); return s; } },
+    { h: "Crit.", cls: "num", f: function(a){ return a.criticidad; } },
+    { h: "Destino", f: function(a){ return a.destino; } },
+    { h: "Vulnerabilidades", f: function(a){
+        if (!(a.vulns || []).length) return el("span", "chip warn", "Sin registrar");
+        var u = el("ul", "list"); a.vulns.forEach(function(v){ u.appendChild(el("li", "", v)); }); return u; } },
+    { h: "Riesgos", f: function(a){
+        if (!(a.riesgos || []).length) return "—";
+        var map = {}; RA.riesgos().forEach(function(r){ map[r.id] = r; });
+        return a.riesgos.map(function(id){ var r = map[id]; return r ? RA.chip(RA.calc(r.p, r.i).n, id) : el("span", "chip info", id + " (no existe)"); }); } }
+  ],
+  rowActions: function(a){ return [{ label: "→ Riesgo", fn: function(){
+    var q = "?activo=" + encodeURIComponent(a.nombre) + ((a.vulns || [])[0] ? "&vuln=" + encodeURIComponent(a.vulns[0]) : "");
+    location.href = "index.html" + q; } }]; }
+});
+
+RA.header("inventario.html");
+
+$("btnImportar").addEventListener("click", function(){
+  var msg = $("msgImp"), f = $("fArchivo").files[0]; msg.className = "msg";
+  if (!f) { msg.textContent = "Selecciona primero el archivo .yaml del laboratorio."; return; }
+  if (f.size > 8 * 1024 * 1024) { msg.textContent = "El archivo supera los 8 MB; no parece un laboratorio CML."; return; }
+  f.text().then(function(t){
+    var r;
+    try { r = CML.importar(t); } catch (e) { msg.textContent = "No se pudo importar: " + e.message; return; }
+    if (inv.activos.length && !window.confirm("Se reemplazarán los " + inv.activos.length + " activos actuales por los " + r.activos.length + " del archivo. ¿Continuar?")) return;
+    inv = { titulo: r.titulo, descripcion: r.descripcion, activos: r.activos, enlaces: r.enlaces, origen: "cml", importado: RA.hoy() };
+    RA.save(RA.KEYS.inv, inv); crud.render(); refrescar();
+    var n = r.activos.reduce(function(s, a){ return s + a.vulns.length; }, 0);
+    msg.className = "msg ok";
+    msg.textContent = "Importados " + r.activos.length + " nodos, " + r.enlaces.length + " enlaces y " + r.redes.length + " redes. Se sugirieron " + n + " vulnerabilidades para validar. No se guardó ninguna contraseña ni clave.";
+  }, function(){ msg.textContent = "No se pudo leer el archivo."; });
+});
+$("btnVaciar").addEventListener("click", function(){
+  if (!window.confirm("Se borrará todo el inventario. ¿Continuar?")) return;
+  inv = RA.clone(RA.INV_DEF); RA.save(RA.KEYS.inv, inv); crud.render(); refrescar(); $("msgImp").textContent = "";
+});
+refrescar();
+</script>
+</body>
+</html>

@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RiskAndes · Configuración en la nube</title>
+<meta name="description" content="Diseño de zonas, instancias y reglas de firewall en la nube con auditoría automática de reglas peligrosas.">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header id="top"></header>
+<main>
+  <section class="card" aria-label="Proveedor">
+    <h2>1. Proveedor y propuesta inicial</h2>
+    <div class="crud-grid">
+      <div><label for="prov">Plataforma (nivel gratuito)</label>
+        <select id="prov">
+          <option value="">— elegir —</option><option>Oracle Cloud (Always Free)</option><option>AWS (Free Tier)</option>
+          <option>Google Cloud (Free Tier)</option><option>Microsoft Azure (cuenta gratuita)</option><option>Otro</option>
+        </select></div>
+      <div><label for="region">Región</label><input id="region" maxlength="60" placeholder="Ej.: sa-santiago-1"></div>
+    </div>
+    <p class="note">La propuesta toma el inventario: crea una zona por cada red privada de los activos a migrar y una instancia por cada activo con destino «Migrar a instancia». Es un punto de partida para que lo ajustes.</p>
+    <button type="button" class="primary" id="btnProponer">Generar zonas e instancias desde el inventario</button>
+    <button type="button" id="btnBase">Agregar reglas base recomendadas</button>
+    <div class="msg" id="msgProp" role="status"></div>
+  </section>
+
+  <section class="card" aria-label="Auditoría"><h2>Auditoría de la configuración</h2><div class="kpis" id="kAud"></div><div id="aud" style="margin-top:12px"></div></section>
+
+  <section class="card" aria-label="Zonas"><h2>2. Zonas (segmentación de red)</h2><div id="crudZ"></div></section>
+  <section class="card" aria-label="Instancias"><h2>3. Instancias</h2><div id="crudI"></div></section>
+  <section class="card" aria-label="Reglas"><h2>4. Reglas de seguridad (firewall / grupos de seguridad)</h2>
+    <p class="note">Origen y destino aceptan un ID de zona (Z-01), un CIDR (10.0.0.0/8) o «internet». El puerto acepta «22», «80,443», «1000-2000» o «any».</p>
+    <div id="crudR"></div></section>
+</main>
+<script src="common.js"></script>
+<script src="cml.js"></script>
+<script src="audit.js"></script>
+<script>
+"use strict";
+var $ = RA.$, el = RA.el;
+var nube = RA.load(RA.KEYS.nube, RA.NUBE_DEF);
+function guardar(){ RA.save(RA.KEYS.nube, nube); }
+function inv(){ return RA.load(RA.KEYS.inv, RA.INV_DEF); }
+var TIPOZ = [{ v: "publica", l: "Pública" }, { v: "privada", l: "Privada (aplicación)" }, { v: "datos", l: "Datos" }, { v: "gestion", l: "Gestión / administración" }, { v: "monitoreo", l: "Monitoreo / SIEM" }];
+var TZ = {}; TIPOZ.forEach(function(t){ TZ[t.v] = t.l; });
+function nomZona(id){ var z = nube.zonas.filter(function(x){ return x.id === id; })[0]; return z ? id + " · " + z.nombre : (id || "—"); }
+
+/* Proveedor / región */
+$("prov").value = nube.proveedor || ""; $("region").value = nube.region || "";
+$("prov").addEventListener("change", function(){ nube.proveedor = $("prov").value; guardar(); });
+$("region").addEventListener("input", function(){ nube.region = $("region").value.trim(); guardar(); });
+
+/* Auditoría */
+function auditar(){
+  var res = AUD.auditar(nube), k = $("kAud"), box = $("aud"); k.textContent = ""; box.textContent = "";
+  var cnt = { critico: 0, alto: 0, medio: 0, info: 0 }; res.forEach(function(f){ cnt[f.sev]++; });
+  [["k-critico", "critico", "Críticos"], ["k-alto", "alto", "Altos"], ["k-medio", "medio", "Medios"], ["", "info", "Informativos"]].forEach(function(t){
+    var d = el("div", "kpi " + t[0]); d.appendChild(el("b", "", String(cnt[t[1]]))); d.appendChild(el("span", "", t[2])); k.appendChild(d); });
+  if (!nube.zonas.length && !nube.instancias.length && !nube.reglas.length) { box.appendChild(el("p", "note", "Define zonas, instancias y reglas (o genera la propuesta) para auditar.")); return; }
+  if (!res.length) { box.appendChild(el("p", "msg ok", "Sin hallazgos: las reglas no presentan configuraciones peligrosas conocidas.")); return; }
+  box.appendChild(RA.table([
+    { h: "Severidad", f: function(f){ return el("span", "chip " + (f.sev === "info" ? "info" : f.sev), f.sev === "critico" ? "Crítico" : f.sev === "alto" ? "Alto" : f.sev === "medio" ? "Medio" : "Info"); } },
+    { h: "Hallazgo", f: function(f){ var d = el("div"); d.appendChild(el("b", "", f.regla)); d.appendChild(el("small", "", f.detalle)); return d; } },
+    { h: "Recomendación", f: function(f){ return f.rec; } },
+    { h: "ISO 27001:2022", f: function(f){ return f.iso; } }
+  ], res));
+}
+function cambio(){ guardar(); auditar(); }
+
+var crudZ = RA.crud({
+  mount: $("crudZ"), prefix: "Z", agregar: "＋ Agregar zona", vacio: "Sin zonas definidas.",
+  get: function(){ return nube.zonas; }, set: function(l){ nube.zonas = l; guardar(); }, onChange: function(){ auditar(); crudI.render(); crudR.render(); },
+  fields: [
+    { k: "nombre", label: "Nombre", req: true, maxlength: 80 },
+    { k: "cidr", label: "CIDR", req: true, placeholder: "10.0.2.0/24", maxlength: 18 },
+    { k: "tipo", label: "Tipo", type: "select", options: TIPOZ }
+  ],
+  validar: function(r){ return /^\d{1,3}(\.\d{1,3}){3}\/\d{1,2}$/.test(r.cidr) && +r.cidr.split("/")[1] <= 32 ? "" : "CIDR inválido (ej.: 10.0.2.0/24)."; },
+  cols: [
+    { h: "ID", f: function(r){ return r.id; } }, { h: "Zona", f: function(r){ return r.nombre; } },
+    { h: "CIDR", f: function(r){ return r.cidr; } }, { h: "Tipo", f: function(r){ return TZ[r.tipo] || r.tipo; } }
+  ]
+});
+var crudI = RA.crud({
+  mount: $("crudI"), prefix: "I", agregar: "＋ Agregar instancia", vacio: "Sin instancias.",
+  get: function(){ return nube.instancias; }, set: function(l){ nube.instancias = l; guardar(); }, onChange: auditar,
+  fields: [
+    { k: "nombre", label: "Nombre", req: true, maxlength: 80 },
+    { k: "zona", label: "Zona", type: "select", options: function(){ return [{ v: "", l: "— sin zona —" }].concat(nube.zonas.map(function(z){ return { v: z.id, l: z.id + " · " + z.nombre }; })); } },
+    { k: "publica", label: "IP pública", type: "select", options: [{ v: "no", l: "No" }, { v: "si", l: "Sí" }],
+      toForm: function(v){ return v ? "si" : "no"; }, fromForm: function(v){ return v === "si"; } },
+    { k: "tamano", label: "Tamaño", def: "1 vCPU / 1 GB", maxlength: 40 },
+    { k: "so", label: "Sistema / rol", maxlength: 60 },
+    { k: "activo", label: "Activo de origen", type: "select", options: function(){ return [{ v: "", l: "— ninguno —" }].concat(inv().activos.map(function(a){ return { v: a.id, l: a.nombre }; })); } }
+  ],
+  cols: [
+    { h: "ID", f: function(r){ return r.id; } }, { h: "Instancia", f: function(r){ return r.nombre; } },
+    { h: "Zona", f: function(r){ return nomZona(r.zona); } },
+    { h: "IP pública", f: function(r){ return el("span", "chip " + (r.publica ? "warn" : "info"), r.publica ? "Sí" : "No"); } },
+    { h: "Tamaño", f: function(r){ return r.tamano; } }, { h: "Sistema / rol", f: function(r){ return r.so || "—"; } },
+    { h: "Origen", f: function(r){ return r.activo || "—"; } }
+  ]
+});
+var crudR = RA.crud({
+  mount: $("crudR"), prefix: "G", agregar: "＋ Agregar regla", vacio: "Sin reglas.",
+  get: function(){ return nube.reglas; }, set: function(l){ nube.reglas = l; guardar(); }, onChange: auditar,
+  fields: [
+    { k: "nombre", label: "Nombre / propósito", req: true, maxlength: 100 },
+    { k: "dir", label: "Dirección", type: "select", options: ["entrada", "salida"] },
+    { k: "proto", label: "Protocolo", type: "select", options: ["tcp", "udp", "icmp", "any"] },
+    { k: "puerto", label: "Puerto(s)", req: true, placeholder: "22 | 80,443 | any", maxlength: 40 },
+    { k: "origen", label: "Origen", req: true, placeholder: "Z-01 | 10.0.0.0/8 | internet", maxlength: 40 },
+    { k: "destino", label: "Destino", req: true, placeholder: "Z-02 | todas", maxlength: 40 },
+    { k: "accion", label: "Acción", type: "select", options: ["permitir", "denegar"] }
+  ],
+  validar: function(r){ return /^(any|\*|todos?|all|\d+(-\d+)?(,\d+(-\d+)?)*)$/i.test(r.puerto.replace(/\s/g, "")) ? "" : "Puerto inválido: usa 22, 80,443, 1000-2000 o any."; },
+  cols: [
+    { h: "ID", f: function(r){ return r.id; } }, { h: "Regla", f: function(r){ return r.nombre; } },
+    { h: "Dir.", f: function(r){ return r.dir; } }, { h: "Proto/puerto", f: function(r){ return r.proto + "/" + r.puerto; } },
+    { h: "Origen → destino", f: function(r){ return r.origen + " → " + r.destino; } },
+    { h: "Acción", f: function(r){ return el("span", "chip " + (r.accion === "permitir" ? "warn" : "ok"), r.accion); } }
+  ]
+});
+
+$("btnProponer").addEventListener("click", function(){
+  var msg = $("msgProp"); msg.className = "msg";
+  var I = inv();
+  if (!I.activos.length) { msg.textContent = "El inventario está vacío: importa o agrega activos primero."; return; }
+  var zonas = AUD.proponerZonas(I), insts = AUD.proponerInstancias(I, zonas);
+  if (!zonas.length && !insts.length) { msg.textContent = "Ningún activo tiene destino «Migrar a instancia en la nube»."; return; }
+  if ((nube.zonas.length || nube.instancias.length) && !window.confirm("Se reemplazarán las zonas e instancias actuales por la propuesta. ¿Continuar?")) return;
+  nube.zonas = zonas; nube.instancias = insts; guardar(); crudZ.render(); crudI.render(); auditar();
+  msg.className = "msg ok"; msg.textContent = "Propuesta creada: " + zonas.length + " zonas y " + insts.length + " instancias. Revisa los tipos de zona y los tamaños.";
+});
+$("btnBase").addEventListener("click", function(){
+  var msg = $("msgProp"); msg.className = "msg";
+  if (!nube.zonas.length) { msg.textContent = "Define las zonas antes de agregar reglas base."; return; }
+  var base = AUD.reglasBase(nube.zonas), n = nube.reglas.length;
+  nube.reglas = nube.reglas.concat(base.map(function(r, i){ r.id = "G-" + String(n + i + 1).padStart(2, "0"); return r; }));
+  guardar(); crudR.render(); auditar(); msg.className = "msg ok"; msg.textContent = "Se agregaron " + base.length + " reglas base (mínimo privilegio y denegación por defecto).";
+});
+
+RA.header("nube.html");
+auditar();
+</script>
+</body>
+</html>

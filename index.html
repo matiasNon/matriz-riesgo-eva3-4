@@ -5,148 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>RiskAndes · Matriz de Riesgos CoopAndes Digital</title>
 <meta name="description" content="Matriz de riesgos de ciberseguridad (R = P × I) para CoopAndes Digital, con mapa de calor, riesgo residual y controles ISO/IEC 27001:2022.">
-<style>
-:root{
-  --bg:#f4f6fa; --panel:#ffffff; --text:#1b2433; --muted:#5b6678; --line:#d9dfea;
-  --brand:#1f5fbf; --brand-ink:#ffffff; --focus:#1f5fbf;
-  --bajo:#2e9e5b;   --bajo-soft:#d6f0e0;   --bajo-ink:#ffffff;
-  --medio:#f2c230;  --medio-soft:#fcf0c2;  --medio-ink:#2b2200;
-  --alto:#f08a24;   --alto-soft:#fde0c4;   --alto-ink:#2b1500;
-  --critico:#d93636;--critico-soft:#f9d0d0;--critico-ink:#ffffff;
-  --shadow:0 1px 3px rgba(20,30,50,.10);
-}
-:root[data-theme="dark"]{
-  --bg:#0f1521; --panel:#182032; --text:#e6ebf5; --muted:#9aa6bd; --line:#2b3650;
-  --brand:#5b9bff; --brand-ink:#08142b; --focus:#8bb8ff;
-  --bajo:#3fb878;   --bajo-soft:#173a2a;   --bajo-ink:#06190f;
-  --medio:#e9bd2c;  --medio-soft:#3c3412;  --medio-ink:#241c00;
-  --alto:#f29a45;   --alto-soft:#42280f;   --alto-ink:#2a1500;
-  --critico:#ef5a5a;--critico-soft:#4a1b1b;--critico-ink:#2a0707;
-  --shadow:none;
-}
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){
-    --bg:#0f1521; --panel:#182032; --text:#e6ebf5; --muted:#9aa6bd; --line:#2b3650;
-    --brand:#5b9bff; --brand-ink:#08142b; --focus:#8bb8ff;
-    --bajo:#3fb878;   --bajo-soft:#173a2a;   --bajo-ink:#06190f;
-    --medio:#e9bd2c;  --medio-soft:#3c3412;  --medio-ink:#241c00;
-    --alto:#f29a45;   --alto-soft:#42280f;   --alto-ink:#2a1500;
-    --critico:#ef5a5a;--critico-soft:#4a1b1b;--critico-ink:#2a0707;
-    --shadow:none;
-  }
-}
-*{box-sizing:border-box}
-html{color-scheme:light dark}
-body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-a{color:var(--brand)}
-:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
-header.top{background:var(--panel);border-bottom:1px solid var(--line);padding:12px 16px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
-.brand{display:flex;align-items:center;gap:12px}
-.brand svg{width:40px;height:40px;flex:none}
-.brand h1{font-size:1.15rem;margin:0;line-height:1.2}
-.brand p{margin:0;color:var(--muted);font-size:.8rem}
-.actions{display:flex;flex-wrap:wrap;gap:8px}
-button,.btn{font:inherit;border:1px solid var(--line);background:var(--panel);color:var(--text);padding:7px 12px;border-radius:8px;cursor:pointer}
-button:hover{border-color:var(--brand)}
-button.primary{background:var(--brand);color:var(--brand-ink);border-color:var(--brand);font-weight:600}
-button.danger{color:var(--critico)}
-button.small{padding:3px 8px;font-size:.8rem}
-main{max-width:1280px;margin:0 auto;padding:16px;display:grid;gap:16px}
-section.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;box-shadow:var(--shadow)}
-section.card>h2{margin:0 0 12px;font-size:1.05rem}
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
-.kpi{border-radius:10px;padding:12px;border:1px solid var(--line)}
-.kpi b{display:block;font-size:1.8rem;line-height:1.1}
-.kpi span{font-size:.8rem;color:var(--muted)}
-.kpi.k-critico{background:var(--critico-soft)} .kpi.k-alto{background:var(--alto-soft)}
-.kpi.k-medio{background:var(--medio-soft)} .kpi.k-bajo{background:var(--bajo-soft)}
-.kpi.k-critico span,.kpi.k-alto span,.kpi.k-medio span,.kpi.k-bajo span{color:var(--text)}
-.grid2{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:16px}
-@media (max-width:900px){.grid2{grid-template-columns:1fr}}
-form .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:10px}
-label{display:block;font-size:.8rem;color:var(--muted);margin-bottom:3px}
-input,select,textarea{width:100%;font:inherit;color:var(--text);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 9px}
-textarea{resize:vertical;min-height:54px}
-.req::after{content:" *";color:var(--critico)}
-fieldset{border:1px dashed var(--line);border-radius:10px;margin:0 0 10px;padding:10px}
-legend{font-size:.8rem;color:var(--muted);padding:0 6px}
-.preview{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:6px 0 10px;font-size:.9rem}
-.msg{min-height:1.3em;font-size:.85rem;color:var(--critico);margin:6px 0}
-.msg.ok{color:var(--bajo)}
-.chip{display:inline-block;padding:2px 9px;border-radius:999px;font-size:.78rem;font-weight:700;white-space:nowrap}
-.chip.bajo{background:var(--bajo);color:var(--bajo-ink)} .chip.medio{background:var(--medio);color:var(--medio-ink)}
-.chip.alto{background:var(--alto);color:var(--alto-ink)} .chip.critico{background:var(--critico);color:var(--critico-ink)}
-.heatwrap{display:flex;gap:8px;align-items:stretch}
-.axisY{writing-mode:vertical-rl;transform:rotate(180deg);text-align:center;font-size:.8rem;color:var(--muted)}
-.heat{display:grid;grid-template-columns:24px repeat(5,1fr);grid-template-rows:repeat(5,minmax(62px,auto)) 24px;gap:4px;flex:1}
-.hc{border-radius:6px;padding:3px;font-size:.72rem;display:flex;flex-wrap:wrap;gap:2px;align-content:flex-start;position:relative;min-height:62px}
-.hc small{position:absolute;right:4px;bottom:1px;opacity:.55;font-size:.65rem}
-.hc.bajo{background:var(--bajo-soft);border:1px solid var(--bajo)} .hc.medio{background:var(--medio-soft);border:1px solid var(--medio)}
-.hc.alto{background:var(--alto-soft);border:1px solid var(--alto)} .hc.critico{background:var(--critico-soft);border:1px solid var(--critico)}
-.pill{background:var(--text);color:var(--bg);border-radius:5px;padding:0 5px;font-weight:700;font-size:.72rem;height:fit-content}
-.ax{font-size:.75rem;color:var(--muted);display:flex;align-items:center;justify-content:center}
-.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
-.seg button{border:0;border-radius:0}
-.seg button[aria-pressed="true"]{background:var(--brand);color:var(--brand-ink)}
-.legend{display:flex;flex-wrap:wrap;gap:8px;font-size:.8rem;margin-top:8px}
-.chart{display:flex;gap:18px;align-items:flex-end;height:190px;padding:8px 4px 0;border-bottom:1px solid var(--line)}
-.grp{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
-.bars{display:flex;gap:6px;align-items:flex-end;height:calc(100% - 20px);width:100%;justify-content:center}
-.bar{width:34%;max-width:48px;min-height:2px;border-radius:5px 5px 0 0;position:relative}
-.bar span{position:absolute;top:-18px;left:0;right:0;text-align:center;font-size:.75rem;font-weight:700}
-.bar.inh{background:var(--text);opacity:.85} .bar.res{background:var(--brand)}
-.grp>em{font-style:normal;font-size:.78rem;margin-top:4px}
-.chartleg{font-size:.8rem;margin-top:6px;display:flex;gap:14px}
-.sw{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:4px;vertical-align:-1px}
-.filters{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px;align-items:end}
-.filters>div{min-width:160px;flex:1}
-.tablewrap{overflow-x:auto}
-table{border-collapse:collapse;width:100%;font-size:.85rem}
-th,td{border-bottom:1px solid var(--line);padding:7px 8px;text-align:left;vertical-align:top}
-th{background:var(--bg);position:sticky;top:0;white-space:nowrap}
-th button{all:unset;cursor:pointer;font-weight:700}
-th button:focus-visible{outline:2px solid var(--focus)}
-td.num{text-align:center}
-td small{color:var(--muted);display:block}
-.delta{font-weight:700;white-space:nowrap}
-.mini{display:flex;gap:4px;align-items:center}
-.empty{padding:18px;text-align:center;color:var(--muted)}
-.tests td.ok{color:var(--bajo);font-weight:700} .tests td.fail{color:var(--critico);font-weight:700}
-.note{font-size:.8rem;color:var(--muted)}
-.printonly{display:none}
-@media print{
-  :root{--bg:#fff;--panel:#fff;--text:#000;--line:#bbb;--muted:#444}
-  header.top .actions,.noprint,form,.filters,.seg{display:none!important}
-  .printonly{display:block}
-  body{font-size:11px} main{padding:0;max-width:none} section.card{box-shadow:none;break-inside:avoid;border-color:#bbb}
-  .grid2{grid-template-columns:1fr 1fr}
-  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-}
-</style>
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<header class="top">
-  <div class="brand">
-    <svg viewBox="0 0 48 48" role="img" aria-label="Logotipo RiskAndes">
-      <rect width="48" height="48" rx="10" fill="#1f5fbf"/>
-      <path d="M4 38 L17 16 L24 27 L30 19 L44 38 Z" fill="#ffffff" opacity=".95"/>
-      <path d="M17 16 L20 21 L14 21 Z" fill="#d93636"/>
-      <circle cx="35" cy="12" r="4" fill="#f2c230"/>
-    </svg>
-    <div>
-      <h1>RiskAndes · Matriz de Riesgos</h1>
-      <p>CoopAndes Digital · R = Probabilidad × Impacto · ISO/IEC 27001:2022</p>
-    </div>
-  </div>
-  <div class="actions">
-    <button id="btnTema" type="button" aria-label="Cambiar tema claro u oscuro">Tema</button>
-    <button id="btnCsv" type="button">Exportar CSV</button>
-    <button id="btnPrint" type="button" class="primary">Imprimir / PDF</button>
-    <button id="btnReset" type="button" class="danger">Restablecer caso</button>
-  </div>
-</header>
+<header id="top"></header>
 
 <main>
+  <p class="note noprint" style="margin:0">Matriz de riesgos · R = Probabilidad × Impacto · controles ISO/IEC 27001:2022. Los datos se guardan en este navegador; usa la pestaña <b>Informe</b> para respaldarlos.</p>
   <h2 class="printonly" style="margin:0">Informe de matriz de riesgos — CoopAndes Digital <span id="fechaPrint"></span></h2>
 
   <section class="card" aria-label="Panel resumen">
@@ -262,26 +127,10 @@ td small{color:var(--muted);display:block}
   </section>
 </main>
 
+<script src="common.js"></script>
 <script>
 "use strict";
-/* ============ Modelo de cálculo (R = P × I) ============ */
-function nivelDe(r){
-  if (r >= 17) return {k:"critico", nombre:"Crítico", accion:"Intervenir ya"};
-  if (r >= 10) return {k:"alto",    nombre:"Alto",    accion:"Intervenir pronto"};
-  if (r >= 6)  return {k:"medio",   nombre:"Medio",   accion:"Mejorar controles"};
-  return            {k:"bajo",    nombre:"Bajo",    accion:"Monitorear"};
-}
-function calc(p, i){ var r = p * i; return {r:r, n:nivelDe(r)}; }
-
-var ISO = {
-  "A.5.15":"Control de acceso","A.5.16":"Gestión de identidad","A.5.17":"Información de autenticación",
-  "A.5.28":"Recopilación de evidencia","A.5.30":"Preparación TIC para la continuidad","A.5.34":"Privacidad y protección de datos personales",
-  "A.6.3":"Concienciación y capacitación","A.7.1":"Perímetros de seguridad física","A.7.2":"Entrada física","A.7.4":"Monitoreo de seguridad física",
-  "A.8.2":"Derechos de acceso privilegiado","A.8.3":"Restricción de acceso a la información","A.8.4":"Acceso al código fuente",
-  "A.8.5":"Autenticación segura","A.8.6":"Gestión de la capacidad","A.8.7":"Protección contra malware","A.8.8":"Gestión de vulnerabilidades técnicas",
-  "A.8.13":"Respaldo de la información","A.8.14":"Redundancia","A.8.15":"Registro (logging)","A.8.16":"Actividades de monitoreo",
-  "A.8.20":"Seguridad de redes","A.8.22":"Segregación de redes","A.8.24":"Uso de criptografía"
-};
+var nivelDe = RA.nivelDe, calc = RA.calc, ISO = RA.ISO, CASO = RA.CASO;
 
 var CATALOGO = [
   {n:"Almacenamiento en nube expuesto públicamente", a:"Bucket de almacenamiento", am:"Fuga de datos por acceso público no autorizado", v:"Bucket con acceso público de lectura", c:"Activar Block Public Access, política de mínimo privilegio, cifrado SSE-KMS y versionado.", iso:"A.5.15, A.8.3, A.8.24"},
@@ -298,46 +147,17 @@ var CATALOGO = [
   {n:"Denegación de servicio (DoS/DDoS)", a:"Portal web", am:"Indisponibilidad del servicio", v:"Sin mitigación ni capacidad elástica", c:"CDN/WAF con protección DDoS, límites de tasa y redundancia.", iso:"A.8.20, A.8.6, A.8.14"}
 ];
 
-/* Caso CoopAndes Digital: 6 hallazgos con justificación (escala de la Guía Didáctica) */
-var CASO = [
-  {id:"R-01", activo:"Bucket S3 de respaldos", amenaza:"Fuga de datos de respaldos por acceso público no autorizado", vulnerabilidad:"Bucket con acceso público de lectura",
-   p:5, i:4, fuente:"P=5: buckets públicos son escaneados de forma activa en Internet (Guía Didáctica, nivel 5: intentos activos). I=4: respaldos con datos financieros de la cooperativa (nivel 4). Evidencia: hallazgo del caso; verificable con AWS Config (s3-bucket-public-read-prohibited).",
-   control:"Activar S3 Block Public Access a nivel de cuenta, política de mínimo privilegio, cifrado SSE-KMS y versionado.", iso:"A.5.15, A.8.3, A.8.24", pr:1, ir:3},
-  {id:"R-02", activo:"Security Group de servidores", amenaza:"Fuerza bruta y acceso remoto no autorizado a servidores", vulnerabilidad:"SSH (22) y RDP (3389) abiertos a 0.0.0.0/0",
-   p:5, i:4, fuente:"P=5: puertos 22/3389 expuestos reciben intentos de autenticación automatizados continuos (nivel 5). I=4: acceso a sistemas críticos. Evidencia: hallazgo del caso; verificable con Security Group y AWS Trusted Advisor.",
-   control:"Cerrar 22/3389 a Internet; acceso por VPN o Session Manager con MFA y rangos IP permitidos.", iso:"A.8.20, A.8.22, A.8.5", pr:1, ir:4},
-  {id:"R-03", activo:"Cuenta root de la nube", amenaza:"Toma de control total de la cuenta por credencial comprometida", vulnerabilidad:"Sin MFA y usada por tres personas (sin trazabilidad individual)",
-   p:3, i:5, fuente:"P=3: vulnerabilidad conocida (sin MFA, credencial compartida) pero sin intentos activos documentados (nivel 3). I=5: root controla toda la operación y datos; paralización o violación legal (nivel 5). Evidencia: hallazgo del caso; verificable con IAM Credential Report.",
-   control:"MFA con llave física en root, usuarios nominales por IAM Identity Center, no usar root a diario y alarma ante su uso.", iso:"A.5.16, A.5.17, A.8.2, A.8.5", pr:1, ir:5},
-  {id:"R-04", activo:"Base de datos del portal", amenaza:"Exfiltración de datos personales y financieros de socios", vulnerabilidad:"IP pública y almacenamiento sin cifrar",
-   p:4, i:5, fuente:"P=4: base con IP pública es objetivo de intentos documentados (nivel 4). I=5: datos personales y financieros de miles de socios con exposición legal (Ley 19.628) (nivel 5). Evidencia: hallazgo del caso; verificable en la configuración de la instancia de base de datos.",
-   control:"Mover a subred privada sin IP pública, cifrado en reposo (KMS) y TLS obligatorio, acceso solo desde la aplicación.", iso:"A.8.24, A.8.20, A.5.34", pr:1, ir:4},
-  {id:"R-05", activo:"Plataforma en la nube (auditoría)", amenaza:"Incidente no detectado y sin evidencia forense", vulnerabilidad:"Ausencia de registro de actividad en la nube",
-   p:3, i:4, fuente:"P=3: sin registro no se detectan incidentes ni se reconstruyen (nivel 3). I=4: sin trazabilidad no se puede acotar ni demostrar el alcance de un incidente en sistemas críticos (nivel 4). Evidencia: hallazgo del caso; verificable en la consola del proveedor.",
-   control:"Trail multi-región con validación de integridad, bucket inmutable (Object Lock) y alertas de actividad anómala.", iso:"A.8.15, A.8.16, A.5.28", pr:2, ir:2},
-  {id:"R-06", activo:"Rack on premise y respaldos", amenaza:"Acceso físico no autorizado y pérdida irrecuperable de datos", vulnerabilidad:"Rack sin control de acceso y respaldos sin pruebas de restauración",
-   p:3, i:4, fuente:"P=3: vulnerabilidades conocidas sin intentos documentados (nivel 3). I=4: afecta sistemas críticos y la capacidad de recuperación (nivel 4). Evidencia: hallazgo del caso; verificable con inspección física y bitácora de respaldos.",
-   control:"Cerradura con registro de acceso, CCTV y bitácora; respaldos 3-2-1 con pruebas de restauración trimestrales.", iso:"A.7.1, A.7.2, A.7.4, A.8.13, A.5.30", pr:2, ir:3}
-];
-
 /* ============ Estado y persistencia ============ */
-var KEY = "riskandes.v1";
 var riesgos = [];
 var verMapa = "inh";
 var orden = {col:"r", dir:-1};
 var editando = null;
 
-function cargar(){
-  try { var s = localStorage.getItem(KEY); if (s){ var d = JSON.parse(s); if (Array.isArray(d)) return d; } } catch(e){}
-  return JSON.parse(JSON.stringify(CASO));
-}
-function guardar(){ try { localStorage.setItem(KEY, JSON.stringify(riesgos)); } catch(e){} }
+function cargar(){ return RA.riesgos(); }
+function guardar(){ RA.save(RA.KEYS.riesgos, riesgos); }
 
 /* ============ Utilidades ============ */
-function $(id){ return document.getElementById(id); }
-function el(tag, cls, txt){ var e = document.createElement(tag); if (cls) e.className = cls; if (txt !== undefined) e.textContent = txt; return e; }
-function res(x){ var hasC = x.pr && x.ir; return hasC ? calc(x.pr, x.ir) : calc(x.p, x.i); }
-function chip(n, r){ return el("span", "chip " + n.k, n.nombre + " · " + r); }
+var $ = RA.$, el = RA.el, res = RA.res, chip = RA.chip;
 
 /* ============ Render ============ */
 function render(){
@@ -357,27 +177,7 @@ function renderKpis(){
   kpi("", sumI ? Math.round((sumI - sumR) / sumI * 100) + "%" : "—", "Reducción total tras controles");
 }
 
-function renderHeat(){
-  var h = $("heat"); h.textContent = "";
-  var mapa = {};
-  riesgos.forEach(function(x){
-    var p = verMapa === "inh" ? x.p : (x.pr || x.p), i = verMapa === "inh" ? x.i : (x.ir || x.i);
-    var key = p + "-" + i; (mapa[key] = mapa[key] || []).push(x.id);
-  });
-  for (var p = 5; p >= 1; p--){
-    h.appendChild(el("div","ax",String(p)));
-    for (var i = 1; i <= 5; i++){
-      var r = p*i, n = nivelDe(r);
-      var c = el("div","hc " + n.k);
-      c.title = "P=" + p + ", I=" + i + ", R=" + r + " (" + n.nombre + ")";
-      (mapa[p+"-"+i] || []).forEach(function(id){ c.appendChild(el("span","pill",id)); });
-      c.appendChild(el("small","",String(r)));
-      h.appendChild(c);
-    }
-  }
-  h.appendChild(el("div","ax",""));
-  for (var j = 1; j <= 5; j++) h.appendChild(el("div","ax","I = " + j));
-}
+function renderHeat(){ RA.heat($("heat"), riesgos, verMapa); }
 
 function renderChart(){
   var c = $("chart"); c.textContent = "";
@@ -527,34 +327,29 @@ function setMapa(v){ verMapa = v; $("segInh").setAttribute("aria-pressed", v ===
 $("segInh").addEventListener("click", function(){ setMapa("inh"); });
 $("segRes").addEventListener("click", function(){ setMapa("res"); });
 
-/* ============ Tema, exportar, imprimir, reset ============ */
-function aplicarTema(t){ if (t) document.documentElement.setAttribute("data-theme", t); else document.documentElement.removeAttribute("data-theme"); }
-(function(){ try { var t = localStorage.getItem("riskandes.tema"); if (t) aplicarTema(t); } catch(e){} })();
-$("btnTema").addEventListener("click", function(){
-  var oscuro = document.documentElement.getAttribute("data-theme") === "dark" ||
-    (!document.documentElement.getAttribute("data-theme") && window.matchMedia("(prefers-color-scheme: dark)").matches);
-  var t = oscuro ? "light" : "dark"; aplicarTema(t); try { localStorage.setItem("riskandes.tema", t); } catch(e){}
-});
-$("btnPrint").addEventListener("click", function(){ $("fechaPrint").textContent = "· " + new Date().toLocaleDateString("es-CL"); window.print(); });
-$("btnReset").addEventListener("click", function(){
-  if (!window.confirm("Se reemplazarán todos los riesgos por los 6 hallazgos originales del caso. ¿Continuar?")) return;
-  riesgos = JSON.parse(JSON.stringify(CASO)); guardar(); limpiar(); render();
-});
-function csvCelda(v){
-  v = String(v == null ? "" : v);
-  if (/^[=+\-@\t\r]/.test(v)) v = "'" + v;           // evita inyección de fórmulas en Excel
-  return '"' + v.replace(/"/g, '""') + '"';
-}
-$("btnCsv").addEventListener("click", function(){
+/* ============ Encabezado, exportar, imprimir, reset ============ */
+function exportarCsv(){
   var cab = ["ID","Activo","Amenaza","Vulnerabilidad","P","I","R","Nivel","Accion","Fuente del dato","Control propuesto","ISO 27001:2022","P residual","I residual","R residual","Nivel residual"];
   var filas = riesgos.slice().sort(function(a,b){ return b.p*b.i - a.p*a.i; }).map(function(x){
     var n = calc(x.p,x.i), s = res(x);
-    return [x.id,x.activo,x.amenaza,x.vulnerabilidad,x.p,x.i,n.r,n.n.nombre,n.n.accion,x.fuente,x.control,x.iso,x.pr||"",x.ir||"",s.r,s.n.nombre].map(csvCelda).join(",");
+    return [x.id,x.activo,x.amenaza,x.vulnerabilidad,x.p,x.i,n.r,n.n.nombre,n.n.accion,x.fuente,x.control,x.iso,x.pr||"",x.ir||"",s.r,s.n.nombre];
   });
-  var blob = new Blob(["﻿" + [cab.map(csvCelda).join(",")].concat(filas).join("\r\n")], {type:"text/csv;charset=utf-8"});
-  var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "matriz_riesgos_coopandes.csv";
-  document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
-});
+  RA.download("matriz_riesgos.csv", RA.csv([cab].concat(filas)), "text/csv;charset=utf-8");
+}
+function iniciarEncabezado(){
+  RA.header("index.html", [
+    {id:"btnCsv", label:"Exportar CSV", fn:exportarCsv},
+    {id:"btnPrint", label:"Imprimir / PDF", cls:"primary", fn:function(){ $("fechaPrint").textContent = "· " + RA.hoy(); window.print(); }},
+    {id:"btnVaciar", label:"Vaciar matriz", cls:"danger", fn:function(){
+      if (!window.confirm("Se borrarán todos los riesgos de la matriz para empezar un proyecto nuevo. ¿Continuar?")) return;
+      riesgos = []; guardar(); limpiar(); render();
+    }},
+    {id:"btnReset", label:"Restablecer caso", cls:"danger", fn:function(){
+      if (!window.confirm("Se reemplazarán todos los riesgos por los 6 hallazgos originales del caso CoopAndes. ¿Continuar?")) return;
+      riesgos = JSON.parse(JSON.stringify(CASO)); guardar(); limpiar(); render();
+    }}
+  ]);
+}
 
 /* ============ Casos de prueba de la actividad ============ */
 var PRUEBAS = [[4,5,20,"Crítico"],[2,3,6,"Medio"],[3,5,15,"Alto"],[4,4,16,"Alto"],[1,5,5,"Bajo"]];
@@ -570,7 +365,12 @@ function correrPruebas(){
 $("btnTest").addEventListener("click", correrPruebas);
 
 /* ============ Inicio ============ */
-riesgos = cargar(); limpiar(); render();
+iniciarEncabezado(); riesgos = cargar(); limpiar(); render();
+try {   // precarga desde el inventario: ?activo=...&vuln=...
+  var q = new URLSearchParams(location.search);
+  if (q.get("activo")) $("fActivo").value = q.get("activo").slice(0,120);
+  if (q.get("vuln")) $("fVuln").value = q.get("vuln").slice(0,300);
+} catch(e){}
 </script>
 </body>
 </html>

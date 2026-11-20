@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RiskAndes · Plan de migración</title>
+<meta name="description" content="Plan de migración por fases a la nube, plan de contingencia y gestión de la seguridad (ISO/IEC 27001:2022).">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header id="top"></header>
+<main>
+  <section class="card" aria-label="Resumen del plan"><h2>Resumen del plan</h2><div class="kpis" id="kpis"></div></section>
+
+  <section class="card" aria-label="Fases de migración">
+    <h2>1. Plan de migración por fases</h2>
+    <p class="note">Cada fase exige su <b>plan de reversa (rollback)</b>. Los activos se toman del inventario; los que tienen destino «migrar» o «reemplazar» deben quedar asignados a alguna fase.</p>
+    <div id="cobertura" role="status"></div>
+    <div id="crudFases"></div>
+    <h3 style="margin:14px 0 6px;font-size:.95rem">Cronograma</h3>
+    <div id="gantt" class="gantt"></div>
+  </section>
+
+  <section class="card" aria-label="Plan de contingencia">
+    <h2>2. Plan de contingencia</h2>
+    <p class="note">Los valores de RTO/RPO de la plantilla son <b>ejemplos</b>: ajústalos a lo que tolere la organización.</p>
+    <div id="crudCont"></div>
+  </section>
+
+  <section class="card" aria-label="Gestión de la seguridad">
+    <h2>3. Gestión de la seguridad de la nueva infraestructura (ISO/IEC 27001:2022)</h2>
+    <p class="note">Controles del Anexo A que sostienen la operación en la nube. «Sincronizar» agrega los controles que ya usas en la matriz de riesgos más una base para migración y servicios cloud.</p>
+    <div id="crudSgsi"></div>
+  </section>
+</main>
+<script src="common.js"></script>
+<script>
+"use strict";
+var $ = RA.$, el = RA.el;
+var ESTADOS = ["Pendiente", "En curso", "Hecha"];
+function inv(){ return RA.load(RA.KEYS.inv, RA.INV_DEF); }
+function migrables(){ return inv().activos.filter(function(a){ return /^(Migrar|Reemplazar)/.test(a.destino || ""); }); }
+function lista(key){ return { get: function(){ return RA.load(key, []); }, set: function(l){ RA.save(key, l); } }; }
+
+/* ---------- Fases ---------- */
+var PLANTILLA_FASES = [
+  { nombre: "Descubrimiento y preparación", objetivo: "Validar inventario y dependencias, definir ventanas y asegurar respaldos verificados antes de tocar producción.", criterio: "Inventario validado, respaldos restaurados con éxito en prueba y aprobación del plan.", rollback: "No se modifica producción. Si no hay respaldos verificados, no se inicia la fase siguiente.", sel: function(){ return []; } },
+  { nombre: "Base segura en la nube (landing zone)", objetivo: "Crear la cuenta con MFA, zonas/subredes, reglas de firewall mínimas, registro, monitoreo y cifrado antes de mover cargas.", criterio: "Auditoría de reglas sin hallazgos críticos; registro de actividad habilitado; usuarios nominales con MFA.", rollback: "Destruir y recrear la infraestructura desde plantilla; no afecta al entorno on-premise.", sel: function(){ return []; } },
+  { nombre: "Migración piloto (activos de menor criticidad)", objetivo: "Migrar primero los activos menos críticos para validar el proceso, conectividad y controles.", criterio: "Pruebas funcionales y de seguridad aprobadas; sin incidentes durante la estabilización.", rollback: "Mantener el activo on-premise encendido y revertir DNS/ruteo al origen.", sel: function(a){ return (a.criticidad || 3) <= 3; } },
+  { nombre: "Migración de activos críticos", objetivo: "Mover datos y servicios críticos en ventanas controladas con replicación continua y corte planificado.", criterio: "Datos íntegros (verificación por checksum), RTO cumplido y aprobación del dueño del servicio.", rollback: "Punto de retorno acordado: replicación inversa y reversión de DNS/VPN al origen dentro del RTO.", sel: function(a){ return (a.criticidad || 3) >= 4; } },
+  { nombre: "Validación, corte y desmantelamiento", objetivo: "Validación final, monitoreo reforzado y retiro del entorno on-premise tras un periodo de estabilización.", criterio: "Periodo de estabilización cumplido, auditoría final y borrado seguro de los equipos retirados.", rollback: "No retirar equipos on-premise hasta la aprobación formal posterior al periodo de estabilización.", sel: function(){ return []; } }
+];
+var fases = lista(RA.KEYS.mig);
+var crudFases = RA.crud({
+  mount: $("crudFases"), prefix: "F", agregar: "＋ Agregar fase", vacio: "Sin fases. Agrega una o carga la plantilla de 5 fases.",
+  get: fases.get, set: fases.set, onChange: resumen,
+  fields: [
+    { k: "nombre", label: "Fase", req: true, maxlength: 90 },
+    { k: "responsable", label: "Responsable", maxlength: 80 },
+    { k: "estado", label: "Estado", type: "select", options: ESTADOS },
+    { k: "inicio", label: "Inicio", type: "date" },
+    { k: "fin", label: "Fin", type: "date" },
+    { k: "objetivo", label: "Objetivo y actividades", type: "textarea", maxlength: 500 },
+    { k: "activos", label: "Activos incluidos", type: "checks", vacio: "No hay activos para migrar: define el destino en el inventario.",
+      options: function(){ return migrables().map(function(a){ return { v: a.id, l: a.nombre }; }); } },
+    { k: "criterio", label: "Criterio de éxito", type: "textarea", maxlength: 400 },
+    { k: "rollback", label: "Plan de reversa (rollback) de la fase", type: "textarea", req: true, maxlength: 400 }
+  ],
+  validar: function(r){ return r.inicio && r.fin && r.fin < r.inicio ? "La fecha de fin no puede ser anterior al inicio." : ""; },
+  cols: [
+    { h: "ID", f: function(r){ return r.id; } },
+    { h: "Fase", f: function(r){ var d = el("div"); d.appendChild(el("b", "", r.nombre)); if (r.objetivo) d.appendChild(el("small", "", r.objetivo)); return d; } },
+    { h: "Periodo", f: function(r){ return r.inicio || r.fin ? (r.inicio || "?") + " → " + (r.fin || "?") : "Sin fechas"; } },
+    { h: "Responsable", f: function(r){ return r.responsable || "—"; } },
+    { h: "Estado", f: function(r){ return el("span", "chip " + (r.estado === "Hecha" ? "ok" : r.estado === "En curso" ? "warn" : "info"), r.estado); } },
+    { h: "Activos", f: function(r){
+        var m = {}; inv().activos.forEach(function(a){ m[a.id] = a.nombre; });
+        return (r.activos || []).map(function(id){ return m[id] || id; }).join(", ") || "—"; } },
+    { h: "Criterio de éxito", f: function(r){ return r.criterio || "—"; } },
+    { h: "Rollback", f: function(r){ return r.rollback; } }
+  ]
+});
+var bt = el("button", "small", "Cargar plantilla de 5 fases"); bt.type = "button";
+bt.addEventListener("click", function(){
+  var cur = fases.get();
+  if (cur.length && !window.confirm("Ya hay fases. ¿Agregar la plantilla al final de la lista?")) return;
+  var mig = migrables(), n = cur.length;
+  fases.set(cur.concat(PLANTILLA_FASES.map(function(p, i){
+    return { id: "F-" + String(n + i + 1).padStart(2, "0"), nombre: p.nombre, responsable: "", estado: "Pendiente", inicio: "", fin: "",
+      objetivo: p.objetivo, activos: mig.filter(p.sel).map(function(a){ return a.id; }), criterio: p.criterio, rollback: p.rollback };
+  })));
+  crudFases.render(); resumen();
+});
+crudFases.toolbar.appendChild(bt);
+
+function cobertura(){
+  var asign = {}; fases.get().forEach(function(f){ (f.activos || []).forEach(function(id){ asign[id] = 1; }); });
+  var faltan = migrables().filter(function(a){ return !asign[a.id]; }), box = $("cobertura"); box.textContent = "";
+  if (!migrables().length) { box.appendChild(el("p", "note", "Aún no hay activos con destino de migración en el inventario.")); return { total: 0, ok: 0 }; }
+  if (faltan.length) {
+    var p = el("p", "msg"); p.textContent = "Activos migrables sin fase asignada (" + faltan.length + "): " + faltan.map(function(a){ return a.nombre; }).join(", ") + "."; box.appendChild(p);
+  } else box.appendChild(el("p", "msg ok", "Todos los activos migrables están asignados a una fase."));
+  return { total: migrables().length, ok: migrables().length - faltan.length };
+}
+function gantt(){
+  var g = $("gantt"); g.textContent = "";
+  var F = fases.get().filter(function(f){ return f.inicio && f.fin; });
+  if (!F.length) { g.appendChild(el("p", "note", "Agrega fechas de inicio y fin a las fases para ver el cronograma.")); return; }
+  var t0 = Math.min.apply(null, F.map(function(f){ return Date.parse(f.inicio); })), t1 = Math.max.apply(null, F.map(function(f){ return Date.parse(f.fin); })), span = Math.max(t1 - t0, 86400000);
+  F.forEach(function(f){
+    var row = el("div", "grow"), tr = el("div", "gtrack"), b = el("div", "gbar " + (f.estado === "Hecha" ? "hecha" : f.estado === "En curso" ? "curso" : ""));
+    b.style.left = ((Date.parse(f.inicio) - t0) / span * 100) + "%"; b.style.width = Math.max(2, (Date.parse(f.fin) - Date.parse(f.inicio) + 86400000) / (span + 86400000) * 100) + "%";
+    b.title = f.nombre + ": " + f.inicio + " → " + f.fin;
+    tr.appendChild(b); row.appendChild(el("span", "", f.id + " · " + f.nombre)); row.appendChild(tr); g.appendChild(row);
+  });
+  g.appendChild(el("p", "note", "Del " + new Date(t0).toISOString().slice(0, 10) + " al " + new Date(t1).toISOString().slice(0, 10) + "."));
+}
+
+/* ---------- Contingencia ---------- */
+var PLANTILLA_CONT = [
+  ["Falla de una fase de migración", "Pruebas de validación fallidas o RTO excedido", "Ejecutar el rollback de la fase, congelar cambios y analizar la causa antes de reintentar.", "≤ 4 h", "≤ 15 min"],
+  ["Pérdida de conectividad on-premise ↔ nube", "Caída del túnel VPN o del enlace", "Operar desde el origen on-premise, activar el canal/túnel redundante y reintentar el corte fuera de ventana.", "≤ 2 h", "0 (replicación continua)"],
+  ["Incidente de seguridad durante la migración", "Alerta de acceso no autorizado o credencial comprometida", "Aislar la zona afectada, rotar credenciales, activar el procedimiento de respuesta y preservar los registros como evidencia.", "≤ 1 h (contención)", "No aplica"],
+  ["Pérdida o corrupción de datos en la transferencia", "Diferencia de checksum o fallo de integridad", "Restaurar desde el último respaldo verificado y repetir la transferencia con verificación de integridad.", "≤ 8 h", "≤ 1 h"],
+  ["Indisponibilidad del proveedor o de la región", "Caída del servicio cloud informada por el proveedor", "Mantener el entorno on-premise operativo durante la estabilización o desplegar en otra región desde plantilla.", "≤ 8 h", "≤ 1 h"],
+  ["Desborde de la ventana de mantención", "Se alcanza la hora límite sin completar el corte", "Abortar a la hora límite, revertir al origen y reprogramar; comunicar a las partes interesadas.", "Según la ventana", "No aplica"]
+];
+var cont = lista(RA.KEYS.cont);
+var crudCont = RA.crud({
+  mount: $("crudCont"), prefix: "C", agregar: "＋ Agregar escenario", vacio: "Sin escenarios de contingencia.",
+  get: cont.get, set: cont.set, onChange: resumen,
+  fields: [
+    { k: "escenario", label: "Escenario", req: true, maxlength: 120 },
+    { k: "disparador", label: "Disparador / cómo se detecta", maxlength: 200 },
+    { k: "accion", label: "Acción de respuesta", type: "textarea", req: true, maxlength: 400 },
+    { k: "responsable", label: "Responsable", maxlength: 80 },
+    { k: "rto", label: "RTO (tiempo de recuperación)", maxlength: 40 },
+    { k: "rpo", label: "RPO (pérdida de datos tolerable)", maxlength: 40 },
+    { k: "prueba", label: "Prueba del plan", type: "select", options: ["Sin probar", "Probado"] }
+  ],
+  cols: [
+    { h: "ID", f: function(r){ return r.id; } },
+    { h: "Escenario", f: function(r){ var d = el("div"); d.appendChild(el("b", "", r.escenario)); if (r.disparador) d.appendChild(el("small", "", "Disparador: " + r.disparador)); return d; } },
+    { h: "Acción de respuesta", f: function(r){ return r.accion; } },
+    { h: "Responsable", f: function(r){ return r.responsable || "—"; } },
+    { h: "RTO / RPO", f: function(r){ return (r.rto || "—") + " / " + (r.rpo || "—"); } },
+    { h: "Prueba", f: function(r){ return el("span", "chip " + (r.prueba === "Probado" ? "ok" : "warn"), r.prueba); } }
+  ]
+});
+var bc = el("button", "small", "Cargar plantilla de escenarios"); bc.type = "button";
+bc.addEventListener("click", function(){
+  var cur = cont.get();
+  if (cur.length && !window.confirm("Ya hay escenarios. ¿Agregar la plantilla al final de la lista?")) return;
+  cont.set(cur.concat(PLANTILLA_CONT.map(function(p, i){ return { id: "C-" + String(cur.length + i + 1).padStart(2, "0"), escenario: p[0], disparador: p[1], accion: p[2], responsable: "", rto: p[3], rpo: p[4], prueba: "Sin probar" }; })));
+  crudCont.render(); resumen();
+});
+crudCont.toolbar.appendChild(bc);
+
+/* ---------- SGSI ---------- */
+var BASE_ISO = ["A.5.1", "A.5.23", "A.5.24", "A.5.29", "A.8.9", "A.8.15", "A.8.32"];
+var sgsi = lista(RA.KEYS.sgsi);
+var crudSgsi = RA.crud({
+  mount: $("crudSgsi"), prefix: "S", agregar: "＋ Agregar control", vacio: "Sin controles. Usa «Sincronizar» para partir de los de la matriz.",
+  get: sgsi.get, set: sgsi.set, onChange: resumen,
+  fields: [
+    { k: "codigo", label: "Control (Anexo A)", type: "select", options: function(){ return Object.keys(RA.ISO).sort(function(a, b){ return a.localeCompare(b, "es", { numeric: true }); }).map(function(c){ return { v: c, l: c + " · " + RA.ISO[c] }; }); } },
+    { k: "estado", label: "Estado", type: "select", options: ["No iniciado", "Planificado", "Implementado"] },
+    { k: "responsable", label: "Responsable", maxlength: 80 },
+    { k: "evidencia", label: "Evidencia / cómo se verifica", type: "textarea", maxlength: 300 }
+  ],
+  validar: function(r, l, ed){ return l.some(function(x){ return x.codigo === r.codigo && x.id !== ed; }) ? "Ese control ya está en la lista." : ""; },
+  cols: [
+    { h: "Control", f: function(r){ return r.codigo; } },
+    { h: "Nombre", f: function(r){ return RA.ISO[r.codigo] || ""; } },
+    { h: "Estado", f: function(r){ return el("span", "chip " + (r.estado === "Implementado" ? "ok" : r.estado === "Planificado" ? "warn" : "info"), r.estado); } },
+    { h: "Responsable", f: function(r){ return r.responsable || "—"; } },
+    { h: "Evidencia", f: function(r){ return r.evidencia || "—"; } }
+  ]
+});
+var bs = el("button", "small", "Sincronizar desde la matriz"); bs.type = "button";
+bs.addEventListener("click", function(){
+  var cur = sgsi.get(), have = {}, add = [];
+  cur.forEach(function(r){ have[r.codigo] = 1; });
+  var codes = BASE_ISO.slice();
+  RA.riesgos().forEach(function(r){ (r.iso || "").split(",").forEach(function(c){ c = c.trim(); if (c && codes.indexOf(c) < 0) codes.push(c); }); });
+  codes.sort(function(a, b){ return a.localeCompare(b, "es", { numeric: true }); });
+  codes.forEach(function(c){ if (!have[c] && RA.ISO[c]) add.push(c); });
+  sgsi.set(cur.concat(add.map(function(c, i){ return { id: "S-" + String(cur.length + i + 1).padStart(2, "0"), codigo: c, estado: "No iniciado", responsable: "", evidencia: "" }; })));
+  crudSgsi.render(); resumen();
+});
+crudSgsi.toolbar.appendChild(bs);
+
+/* ---------- Resumen ---------- */
+function resumen(){
+  var F = fases.get(), C = cont.get(), S = sgsi.get(), cov = cobertura(), k = $("kpis"); k.textContent = "";
+  function kpi(cls, n, t){ var d = el("div", "kpi " + cls); d.appendChild(el("b", "", String(n))); d.appendChild(el("span", "", t)); k.appendChild(d); }
+  var hechas = F.filter(function(f){ return f.estado === "Hecha"; }).length;
+  kpi("", F.length, "Fases del plan");
+  kpi("", F.length ? Math.round(hechas / F.length * 100) + "%" : "—", "Avance (fases hechas)");
+  kpi(cov.total && cov.ok < cov.total ? "k-alto" : "", cov.total ? cov.ok + "/" + cov.total : "—", "Activos migrables con fase");
+  kpi("", C.length ? C.filter(function(c){ return c.prueba === "Probado"; }).length + "/" + C.length : "—", "Escenarios de contingencia probados");
+  kpi("", S.length ? S.filter(function(c){ return c.estado === "Implementado"; }).length + "/" + S.length : "—", "Controles ISO implementados");
+  gantt();
+}
+RA.header("migracion.html");
+resumen();
+</script>
+</body>
+</html>
