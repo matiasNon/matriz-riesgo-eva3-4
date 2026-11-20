@@ -10,8 +10,8 @@ Asignatura: Diseño de Arquitectura de Redes Seguras · Docente: Daniel Ruz More
 |---|---|
 | Grupo | N (reemplazar) |
 | Integrantes | _completar_ |
-| Repositorio | `https://github.com/<usuario>/matriz-riesgo-grupoN` _(completar)_ |
-| URL publicada | `https://matriz-riesgo-grupoN.pages.dev` _(completar tras el despliegue)_ |
+| Repositorio | https://github.com/matiasNon/matriz-riesgo-eva3-4 |
+| URL publicada | https://matriz-riesgo-eva3-4.pages.dev |
 
 ## Funcionalidades mínimas (guía de la actividad)
 
@@ -62,13 +62,13 @@ El caso no entrega estadísticas de incidentes, por lo que la justificación de 
 
 ## Publicación en Cloudflare Pages
 
-1. Subir el repositorio a GitHub (público, `matriz-riesgo-grupoN`).
+1. Subir el repositorio a GitHub (público, `matriz-riesgo-eva3-4`).
 2. Cloudflare → Workers & Pages → Create → Pages → Connect to Git → elegir el repositorio.
 3. Framework preset: **None** · Build command: _(vacío)_ · Output directory: `/` (raíz).
-4. Nombre del proyecto `matriz-riesgo-grupoN` → URL `*.pages.dev`. Cada `git push` redespliega.
+4. Nombre del proyecto `matriz-riesgo-eva3-4` → URL `*.pages.dev`. Cada `git push` redespliega.
 
 ```bash
-git remote add origin https://github.com/<usuario>/matriz-riesgo-grupoN.git
+git remote add origin https://github.com/matiasNon/matriz-riesgo-eva3-4.git
 git branch -M main
 git push -u origin main
 ```
