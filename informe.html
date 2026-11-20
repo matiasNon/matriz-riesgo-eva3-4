@@ -65,7 +65,7 @@ function datos(){
     rows: C.map(function(c){ return [c.id, c.escenario, c.disparador || "", c.accion, c.responsable || "", c.rto || "", c.rpo || "", c.prueba]; }), show: [1, 3, 5, 6, 7] };
   T.sgsi = { head: ["Control", "Nombre", "Estado", "Responsable", "Evidencia"],
     rows: S.map(function(s){ return [s.codigo, RA.ISO[s.codigo] || "", s.estado, s.responsable || "", s.evidencia || ""]; }), show: [0, 1, 2, 3] };
-  T.zonas = { head: ["ID", "Zona", "CIDR", "Tipo"], rows: N.zonas.map(function(z){ return [z.id, z.nombre, z.cidr, z.tipo]; }), show: [0, 1, 2, 3] };
+  T.zonas = { head: ["ID", "Zona", "CIDR", "Tipo"], rows: N.zonas.map(function(z){ return [z.id, z.nombre, z.cidr, { publica: "Pública", privada: "Privada (aplicación)", datos: "Datos", gestion: "Gestión / administración", monitoreo: "Monitoreo / SIEM" }[z.tipo] || z.tipo]; }), show: [0, 1, 2, 3] };
   T.inst = { head: ["ID", "Instancia", "Zona", "IP pública", "Tamaño", "Sistema / rol", "Activo de origen"],
     rows: N.instancias.map(function(i){ return [i.id, i.nombre, zn[i.zona] || "", i.publica ? "Sí" : "No", i.tamano || "", i.so || "", nm[i.activo] || i.activo || ""]; }), show: [1, 2, 3, 4] };
   T.reglas = { head: ["ID", "Regla", "Dirección", "Protocolo", "Puerto", "Origen", "Destino", "Acción"],
