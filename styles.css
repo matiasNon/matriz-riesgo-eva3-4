@@ -160,4 +160,7 @@ label.chk input{width:auto}
   .topo{max-height:380px}
   .rep section.card{break-inside:auto}
   tr{break-inside:avoid}
+  h2,h3{break-after:avoid;page-break-after:avoid}
+  .topo,.heat,.rep .grid2>div,.kpis,.kpi{break-inside:avoid;page-break-inside:avoid}
+  .rep h3+table,.rep h3+div{break-before:avoid}
 }
